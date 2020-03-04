@@ -1,7 +1,4 @@
 #pragma once
-#ifndef MODEL_H
-#define MODEL_H
-
 #include "../main.h"
 #include "mesh.h"
 #include <assimp/Importer.hpp>
@@ -47,8 +44,3 @@ private:
 //	Material loadMaterial(aiMaterial* mat);
 	
 };
-
-
-
-
-#endif

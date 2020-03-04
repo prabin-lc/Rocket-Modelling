@@ -157,6 +157,16 @@
     <ClInclude Include="src\shader.h" />
     <ClInclude Include="src\stb_image.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\fire.fs" />
+    <None Include="src\shaders\fire.vs" />
+    <None Include="src\shaders\lamp.fs" />
+    <None Include="src\shaders\lamp.vs" />
+    <None Include="src\shaders\shader.fs" />
+    <None Include="src\shaders\shader.vs" />
+    <None Include="src\shaders\skybox.fs" />
+    <None Include="src\shaders\skybox.vs" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

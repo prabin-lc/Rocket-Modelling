@@ -5,16 +5,20 @@
 #define SCALE 0.2f
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 2.0f, 3.0f));
 float lastX = WIDTH / 2.0f;
 float lastY = HEIGHT / 2.0f;
-float angleX = 0.0f, angleY = 0.0f, angleZ = 0.0f;
+float angleX = 0.0f, angleY = -90.0f, angleZ = 0.0f;
 float scale = 1.0f;
 //glm::vec3 front(camera.Front), rright(camera.Right), up(camera.Up);
 bool firstMouse = true;
 
 bool spotEnabled = false;
 bool spotKeyPressed = false;
+
+bool animating = false;
+float rocketLastYTranslation = 0.f;
+float animationRunTime=0.f;
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -52,7 +56,8 @@ int main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_FRAMEBUFFER_SRGB);
-	//glEnable(GL_CULL_FACE);
+
+	glEnable(GL_CULL_FACE);
 	Shader ourShader("./src/shaders/shader.vs","./src/shaders/shader.fs");
 	Shader lampShader("./src/shaders/lamp.vs", "./src/shaders/lamp.fs");
 	Shader skyboxShader("./src/shaders/skybox.vs", "./src/shaders/skybox.fs");
@@ -66,14 +71,16 @@ int main()
 	//Model houseModel("../Resources/house1/House N111111.3DS");
 	//Model houseModel("../Resources/house2/house2.max");
 	//Model houseModel("../Resources/house3/source/nivelles 9.fbx");
-	Model houseModel("../Resources/rocket2/rocket.obj");
-	//Model houseModel("../Resources/plane/plane.obj");
+	//Model houseModel("../Resources/rocket2/rocket.obj");
+	Model rocket("../Resources/rocket3/rocket.obj");
+	Model base("../Resources/base/base.obj");
+	//Model flame("../Resources/flame/flame.obj");
 	// positions of the point lights
 	glm::vec3 pointLightPositions[] = {
-		glm::vec3(1.4f,  0.4f,  4.0f),
-		glm::vec3(4.6f, -6.6f, -8.0f),
-		glm::vec3(-8.0f,  4.0f, -24.0f),
-		glm::vec3(0.0f,  0.0f, -6.0f)
+		glm::vec3(0.5f,  2.f,  -0.0f),
+		glm::vec3(0.5f, 0.4f, -1.0f),
+		glm::vec3(0.0f,  10.0f, -24.0f),
+		glm::vec3(0.0f,  1.0f, -2.0f)
 	};
 
 	float skyboxVertices[] = {
@@ -140,12 +147,12 @@ int main()
 	//cubemap
 	vector<std::string> faces
 	{
-			"../Resources/skybox/right.jpg",
-			"../Resources/skybox/left.jpg",
-			"../Resources/skybox/top.jpg",
-			"../Resources/skybox/bottom.jpg",
-			"../Resources/skybox/front.jpg",
-			"../Resources/skybox/back.jpg"
+			"../Resources/skybox1/right.jpg",
+			"../Resources/skybox1/left.jpg",
+			"../Resources/skybox1/top.jpg",
+			"../Resources/skybox1/bottom.jpg",
+			"../Resources/skybox1/front.jpg",
+			"../Resources/skybox1/back.jpg"
 	};
 	unsigned int cubemapTexture = loadCubemap(faces);
 	skyboxShader.use();
@@ -155,14 +162,18 @@ int main()
 	// -----------
 	while (!glfwWindowShouldClose(window))
 	{
+		// per-frame time logic
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
+
 		//input
 		processInput(window);
 		// render
-		// ------
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		
+
 		ourShader.use();
 		{
 			ourShader.setVec3("viewPos", camera.Position);
@@ -224,23 +235,39 @@ int main()
 			ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 		}
 
-			glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-			glm::mat4 view = camera.GetViewMatrix();
-			ourShader.setMat4("projection", projection);
-			ourShader.setMat4("view", view);
-		
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera.GetViewMatrix();
+		ourShader.setMat4("projection", projection);
+		ourShader.setMat4("view", view);
+
 		// render the loaded model
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f));
-		model = glm::rotate(model, glm::radians(angleZ), glm::vec3(0.0f,0.0f,-1.0f));
+
+		model = glm::scale(model, scale * glm::vec3(SCALE, SCALE, SCALE));	// it's a bit too big for our scene, so scale it down
+		ourShader.setMat4("model", model);
+		ourShader.setInt("spot", spotEnabled);
+
+		base.Draw(ourShader);
+
+		model = glm::mat4(1.0f);
+
+		if (animating) {
+			animationRunTime += deltaTime;
+			rocketLastYTranslation += deltaTime * 1.f * glm::exp(animationRunTime - 4);
+			model = glm::translate(model, glm::vec3(0.5f, rocketLastYTranslation, -0.4f));
+		}
+		else {
+			model = glm::translate(model, glm::vec3(0.5f, rocketLastYTranslation, -0.40f));
+		}
+		model = glm::rotate(model, glm::radians(angleZ), glm::vec3(0.0f, 0.0f, -1.0f));
 		model = glm::rotate(model, glm::radians(angleY), glm::vec3(0.0f, 1.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(angleX), glm::vec3(1.0f, 0.0f, 0.0f));
 		// translate it down so it's at the center of the scene
-		model = glm::scale(model, scale*glm::vec3(SCALE, SCALE, SCALE));	// it's a bit too big for our scene, so scale it down
+		model = glm::scale(model, scale * glm::vec3(SCALE, SCALE, SCALE));	// it's a bit too big for our scene, so scale it down
 		ourShader.setMat4("model", model);
 		ourShader.setInt("spot", spotEnabled);
-		
-		houseModel.Draw(ourShader);
+		if (rocketLastYTranslation < 2000)
+			rocket.Draw(ourShader);
 
 		// also draw the lamp object(s)
 		lampShader.use();
@@ -253,9 +280,9 @@ int main()
 		{
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, pointLightPositions[i]);
-			model = glm::scale(model, glm::vec3(0.1f)); // Make it a smaller cube
+			model = glm::scale(model, glm::vec3(0.03f)); // Make it a smaller cube
 			lampShader.setMat4("model", model);
-			 glDrawArrays(GL_TRIANGLES, 0, 36);
+			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
 
 		// draw skybox as last
@@ -326,9 +353,6 @@ void checkFailure(GLFWwindow *window)
 }
 void processInput(GLFWwindow *window)
 {
-	float currentFrame = (float)glfwGetTime();
-	deltaTime = currentFrame - lastFrame;
-	lastFrame = currentFrame;
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
@@ -368,6 +392,14 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
 	{
 		spotKeyPressed = false;
+	}
+	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+		animating = !animating;
+	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+	{
+		animating = false;
+		animationRunTime = 0.f;
+		rocketLastYTranslation = 0.f;
 	}
 
 }
